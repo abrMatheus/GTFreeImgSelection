@@ -6,14 +6,10 @@ from skimage.color import gray2rgb
 from skimage.filters import threshold_otsu
 from sklearn.metrics.pairwise import euclidean_distances
 
-from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
-import umap
 
-from ipywidgets import interact, interactive, fixed, interact_manual
-import ipywidgets as widgets
+from ipywidgets import interact
 
-from matplotlib.widgets import TextBox
 
 import pandas as pd
 
@@ -31,11 +27,16 @@ except ModuleNotFoundError:
 def load_mimage(path):
     assert ift is not None, "PyIFT is not available"
 
-    locale.setlocale(locale.LC_NUMERIC, "en_US.UTF-8")
+    try:
+        locale.setlocale(locale.LC_NUMERIC, "en_US.UTF-8")
 
-    mimage = ift.ReadMImage(path)
+        mimage = ift.ReadMImage(path)
 
-    mimage = mimage.AsNumPy().squeeze()
+        mimage = mimage.AsNumPy().squeeze()
+
+    except:
+        print("Error while loading mimage")
+        mimage = np.zeros((200,200,3))
 
     return mimage.copy()
 
@@ -66,9 +67,6 @@ def load_image(path: str, lab: bool = True) -> np.ndarray:
 
 def get_descritor_act_all(svox_dir,im_list,act_dir,band, n0,nf, norm_type='pdf'):
     
-    # act_list  = os.listdir(act_dir)
-    # label_list = os.listdir(label_dir)
-    
     des_array = np.zeros((nf, len(im_list)))
     print("len im list", len(im_list))
     
@@ -88,10 +86,6 @@ def get_descritor_act_all(svox_dir,im_list,act_dir,band, n0,nf, norm_type='pdf')
         s_img = load_image(s_name, lab=False)
         a_img = load_mimage(a_name)
   
-        
-        # mudei aqui!!!!!
-        #b_img = binary_by_otsu_kernel(a_img, s_img, band)
-        
         
         b_img = a_img[:,:,band].copy()
     
@@ -114,23 +108,6 @@ def get_descritor_act_all(svox_dir,im_list,act_dir,band, n0,nf, norm_type='pdf')
 
 
 def render_activation(act_img, orig_img, otsu=False, render_type='heatmap', islice=-1):
-    #print(f"shapes {act_img.shape} {orig_img.shape}")
-    #primeiro encontrar o slice do meio do bang
-
-    # if islice==-1:
-    
-    #     limits=[300,-1]
-        
-    #     for i in range(act_img.shape[0]):
-    #         if(act_img[i].sum()>2):
-    #             #coordenada ativa
-    #             if(limits[0]>i):
-    #                 limits[0]=i
-    #             if(limits[1]<i):
-    #                 limits[1]=i
-    #     thelimit = int(limits[0] + (limits[1]-limits[0])/2)
-    # else:
-    #     thelimit = islice
     
     # a_slice = act_img[thelimit]DONE 2D
     a_slice = act_img.copy()
@@ -139,11 +116,9 @@ def render_activation(act_img, orig_img, otsu=False, render_type='heatmap', isli
         a_slice[a_slice<thresh]=0.0 #so zera valores abaixo
         
     a_slice = a_slice/(a_slice.max()+0.001) # de 0 a 1
-    # o_slice = orig_img[thelimit] DONE 2D
     o_slice = orig_img.copy()
     o_slice = o_slice/(o_slice.max()+0.001) # de 0 a 1
     
-    # o_slice = gray2rgb(o_slice) DONE 2D
     b_slice = 1-a_slice
     a_slice = gray2rgb(a_slice)
     b_slice = gray2rgb(b_slice)
@@ -153,8 +128,6 @@ def render_activation(act_img, orig_img, otsu=False, render_type='heatmap', isli
     elif render_type == 'saliency':
         o_slice = a_slice
 
-
-    #'heatmap','saliency', 'none'
     
     return o_slice
 
@@ -163,8 +136,6 @@ def render_activation(act_img, orig_img, otsu=False, render_type='heatmap', isli
 
 def mostra_acts(rec_min, rec_max, act_dir, im_dir, conf, otsu=False, nim=2):
     band = conf[1]
-
-    # agora irei mostrar essas ativações
     
     fig, axs = plt.subplots(2,nim, figsize=(20,10))
     
@@ -182,11 +153,8 @@ def mostra_acts(rec_min, rec_max, act_dir, im_dir, conf, otsu=False, nim=2):
             
             if os.path.exists(a_path):
             
-                # print(f"a_path '{a_path}'")
-                # print(f"o_path '{o_path}'")
                 o_img = load_image(o_path,lab=False)
-                a_img = load_mimage("data/flim_models/m1/activation1/000633.mimg")
-                # print(a_img.shape, o_img.shape, band)
+                a_img = load_mimage(a_path)
                 
                 oslice = render_activation(a_img[:,:,band], o_img, otsu)
     
@@ -246,8 +214,6 @@ def obtem_imagens_proximas(desc_i, i_act_list, index_i, model='m1', nim=2):
     rec_max = []
     for i in range(nim):
         im_name = i_act_list[int(indexes_max[1][i])].split(".")[0]
-        # rec_ind = recImages['list'].index(im_name)
-        # recImages[conf[0]][rec_ind] = [im_name, indexes_max[0][i], model, conf[1]]
 
         rec_max.append(f"{im_name}.mimg")
 
@@ -263,20 +229,6 @@ def obtem_imagens_proximas(desc_i, i_act_list, index_i, model='m1', nim=2):
     return indexes_min,indexes_max, rec_min, rec_max
 
 
-def restart_RecImages():
-    RecImages = {}
-
-    for c in Classes:
-        RecImages[c]=[]
-
-    RecImages['list']=[]
-    for i in origImList:
-        for c in Classes:
-            RecImages[c].append([i.split(".")[0], 0, 'na', -1])
-        RecImages['list'].append(i.split(".")[0])
-    return RecImages
-
-
 def get_inner_conf(meta_model, inner_m):
     df = pd.read_csv(os.path.join(meta_model,inner_m,"k_description.csv"))
     conf = []
@@ -289,7 +241,6 @@ def get_inner_conf(meta_model, inner_m):
 
 
 def add_new_model(inner_model, selected_image):
-    # conf_inner_model = [("wt",3), ("et",2)] #configura os kernels do modelo [0,n]
 
     #conf---------
     conf_inner_model = get_inner_conf(meta_model,inner_model)
@@ -321,7 +272,6 @@ def add_new_model(inner_model, selected_image):
                 np.save(f, np.array(act_list_i))  
     
         descs.append(desc_norm)
-        #lists.append(act_list_i)
     
         if descs_class[conf[0]] is None:
             descs_class[conf[0]]=desc_norm
@@ -332,22 +282,18 @@ def add_new_model(inner_model, selected_image):
     tmp_rec = {}
     tmp_emb = {}
     for i,c in enumerate(Classes):
-        # print(i,c)
         
         tmp_rec[c] = obtem_imagens_proximas(descs_class[c], act_list, index_sel[-1])
 
         print(descs_class[c].shape)
-        tmp_emb[c] = TSNE(n_components=2, learning_rate='auto',init='random', perplexity=2).fit_transform(descs_class[c]) #perplexidade = n_amostras/n_classes que eu queria ver
-        # tmp_emb[c] = umap.UMAP().fit_transform(descs_class[c])
+        tmp_emb[c] = TSNE(n_components=2, learning_rate='auto',init='random', perplexity=2).fit_transform(descs_class[c])
 
-        #tmp_rec[c] = obtem_imagens_proximas(tmp_emb[c], act_list, index_sel[-1])
     
     recs[inner_model] = tmp_rec
     x_embedded[inner_model] = tmp_emb
     
     conf_model_all[inner_model] = conf_inner_model
     
-    # i_min1,i_max1, rec_min1, rec_max1
 
 
 def get_image_by_index(name, act_dir, orig_dir, conf, render_type='heatmap', islice=-1, otsu=False):
@@ -391,56 +337,25 @@ def my_interact():
             for ii,c in zip([imin,imax],['aqua', 'red']):
                 axs[0].scatter(X_embedded[ii,0],X_embedded[ii,1], marker=m, color=c)
 
-    
-    global render_model
+
+    render_type  = "heatmap" #saliency or none
+    render_conf  = 0.0
     render_model = list(recs.keys())[-1]
-    global render_conf
-    
-    def render_f(c_render):
-        global render_type
-        render_type = c_render 
-    
-    def render_m(c_model):
-        global render_model
-        render_model = c_model 
-    
-    def render_c(c_conf):
-        global render_conf
-        render_conf = c_conf 
 
-    def class_f(c_class):
-        global new_class 
-        new_class= c_class
-        
-    
-    interact(render_f, c_render=['heatmap','saliency', 'none']);
-
-    t_list = list(conf_model_all.keys())[::-1]
-    interact(render_m, c_model=t_list);
-    interact(render_c, c_conf=list(np.linspace(0,4,5)));
+    print("render model", render_model, render_type, render_conf)
 
 
     #-----------------------------------------------------------_
     
     x = np.linspace(1,10,10)
     
-    #%matplotlib widget
-    
     fig, axs = plt.subplots(2,1, figsize=(10,5))
     
 
     ind =0
     def onpick3(event):
-        # debug_msg = "click!!2"
-        # os.system(f" echo {debug_msg} >> debug.txt")
-        # im  = np.zeros((200,200))
-        # im  = get_image_by_index(act_list[int(ind)], t_act_dir, modality_dir, conf, render_type)
-        # get_image_by_index(act_list[0], inn_act_dir, im_dirs[1], conf_inner_model[0])
-        # axs[1].imshow(im)
         if event.mouseevent.button == 1: #left
             ind = event.ind[0]
-            # debug_msg = "click!!3"
-            # os.system(f" echo {debug_msg} >> debug.txt")
             t_act_dir = f"{meta_model}/{render_model}/activation1"
             modality_dir = f"{imgs_dir}"
 
@@ -451,22 +366,16 @@ def my_interact():
                 conf = conf_model_all[render_model][0]
                 c = conf[0]
             
-            # im  = np.zeros((200,200))
             im  = get_image_by_index(act_list[int(ind)], t_act_dir, modality_dir, conf, render_type)
-            # get_image_by_index(act_list[0], inn_act_dir, im_dirs[1], conf_inner_model[0])
             axs[1].imshow(im)
             axs[1].set_title(act_list[int(ind)])
             
-            #TODO: clean no axs[0] e mostrar tudo de novo!!
+            #TODO: clean no axs[0] and show again
     
             axs[0].clear()
             draw_axs(x_embedded[render_model][c], recs[render_model][c])
             axs[0].scatter(x_embedded[render_model][c][ind,0],x_embedded[render_model][c][ind,1], color="black", s=200)
-
-            debug_msg = f"render {ind} {render_type} model {render_model} conf {render_conf} i {act_list[int(ind)]}"
-            os.system(f" echo {debug_msg} >> debug.txt")
             
-            # fig.canvas.draw()
     
     plt.ion()
 
@@ -476,16 +385,9 @@ def my_interact():
     c = conf[0]
     draw_axs(x_embedded[render_model][c], recs[render_model][c])
     
-    # axs[0].scatter(x,x, picker=True)
         
     fig.canvas.mpl_connect('pick_event', onpick3)
     plt.show(block=True)
-    
-    
-    #%matplotlib inline
-    # plt.close()
-
-#my_interact()
 
 
 
