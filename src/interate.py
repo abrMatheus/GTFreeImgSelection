@@ -30,13 +30,11 @@ def load_mimage(path):
     try:
         locale.setlocale(locale.LC_NUMERIC, "en_US.UTF-8")
 
-        mimage = ift.ReadMImage(path)
+    except Exception as e:
+        print("Error while loading mimage: ",e)
 
-        mimage = mimage.AsNumPy().squeeze()
-
-    except:
-        print("Error while loading mimage")
-        mimage = np.zeros((200,200,3))
+    mimage = ift.ReadMImage(path)
+    mimage = mimage.AsNumPy().squeeze()
 
     return mimage.copy()
 
