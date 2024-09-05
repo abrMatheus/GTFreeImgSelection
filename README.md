@@ -19,29 +19,36 @@ To run the docker image runs
 
 ```
 docker pull gtfree_image_selection_flim
-
 ```
 
 now run this particular image with all video permitions:
 
 `
 xhost +local:docker
+`
+`
 docker run --rm -it -d --gpus=all --ipc=host -p 9990:9990 --env="DISPLAY" --name gtfree1 -e DISPLAY=unix$DISPLAY -e XAUTHORITY=$XAUTHORITY -e XDG_RUNTIME_DIR=$XDG_RUNTIME_DIR --shm-size=10g --net=host gtfree_image_selection_flim /bin/bash
 `
+copy this repo to the docker container:
+
+
+
+`
+docker cp GTFreeImgSelection gtfree1:/app/
+`
+
+and
+
 
 `
 docker exec -it gtfree1 bash
 `
 
-`
-docker cp GTFreeImageSelection gtfree1:/app/
-`
-
 and runs the script:
 
 ```
-cd GTFreeImageSelection
-python3 src/interative.py
+cd GTFreeImgSelection
+python3 src/interate.py
 ```
 
 the interface will show the following interaction:
