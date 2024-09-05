@@ -134,10 +134,12 @@ def render_activation(act_img, orig_img, otsu=False, render_type='heatmap', isli
 
 
 
-def mostra_acts(rec_min, rec_max, act_dir, im_dir, conf, otsu=False, nim=2):
+def mostra_acts(rec_min, rec_max, act_dir, im_dir, conf, otsu=False, nim=2, axs=None):
     band = conf[1]
     
-    fig, axs = plt.subplots(2,nim, figsize=(20,10))
+    if axs is None:
+        fig, axs = plt.subplots(2, nim, figsize=(15,7))
+        fig.subplots_adjust(wspace=0.05, hspace=0.05)
     
 
     rec = rec_min
@@ -160,6 +162,8 @@ def mostra_acts(rec_min, rec_max, act_dir, im_dir, conf, otsu=False, nim=2):
     
     
                 axs[k][i].imshow(oslice)
+                axs[k][i].set_xticks([])
+                axs[k][i].set_yticks([])
             else:
                 print("not exist", a_path)
             
@@ -168,7 +172,7 @@ def mostra_acts(rec_min, rec_max, act_dir, im_dir, conf, otsu=False, nim=2):
         #break
     axs[0][0].set_ylabel("Próximos")
     axs[1][0].set_ylabel("Distantes")
-    plt.show()
+    #plt.show()
 
 def obtem_imagens_proximas(desc_i, i_act_list, index_i, model='m1', nim=2):
     indexes_min = np.ones((2,nim))
@@ -310,7 +314,7 @@ def get_image_by_index(name, act_dir, orig_dir, conf, render_type='heatmap', isl
     return oslice
 
 
-def my_interact():
+def my_interact(nim=2):
     plt.close()
 
     def draw_axs(X_embedded, i_recs):
@@ -328,14 +332,21 @@ def my_interact():
         axs[0].legend()
         
         
-        # for imin,imax in zip(recs_norm[0][1], recs_norm[1][1]):
-        #i_min1_1, i_max1_1
+        count_aqua=0
+        count_red =0
         for imin,imax in zip(i_recs[0][1], i_recs[1][1]):
             imin=int(imin)
             imax=int(imax)
             m = '2'
-            for ii,c in zip([imin,imax],['aqua', 'red']):
-                axs[0].scatter(X_embedded[ii,0],X_embedded[ii,1], marker=m, color=c)
+            for ii,c,m2,l2 in zip([imin,imax],['aqua', 'red'], ['*','v'], ['closest','distant']):
+                if count_aqua==0 and l2=='closest':
+                    axs[0].scatter(X_embedded[ii,0],X_embedded[ii,1], marker=m2, color=c, label=l2)
+                    count_aqua=1
+                elif  count_red==0 and l2=='distant':
+                    axs[0].scatter(X_embedded[ii,0],X_embedded[ii,1], marker=m2, color=c, label=l2)
+                    count_red=1
+                else:
+                    axs[0].scatter(X_embedded[ii,0],X_embedded[ii,1], marker=m2, color=c)
 
 
     render_type  = "heatmap" #saliency or none
@@ -349,8 +360,25 @@ def my_interact():
     
     x = np.linspace(1,10,10)
     
-    fig, axs = plt.subplots(2,1, figsize=(10,5))
+    fig = plt.figure( figsize=(10,7))
+    fig.subplots_adjust(wspace=0.05, hspace=0.1)
+
+    gs = fig.add_gridspec(3,nim)
+    ax_proj = fig.add_subplot(gs[0, 0:nim-1])
+    axs_img = fig.add_subplot(gs[0,nim-1:])
+    axs = [ax_proj, axs_img]
+
     
+    axxs = []
+    for i in range(2):
+        axxs.append([])
+        for j in range(nim):
+            ax = fig.add_subplot(gs[i+1, j])
+            axxs[i].append(ax)
+
+    iclass = 'obj'
+    conf=conf_model_all[inner_model][0]
+    mostra_acts(recs[inner_model][iclass][2], recs[inner_model][iclass][3], f"{meta_model}/{inner_model}/activation1", im_dirs[Classes.index(iclass)], conf, axs=axxs)
 
     ind =0
     def onpick3(event):
@@ -384,6 +412,12 @@ def my_interact():
     print(conf, render_conf, render_model)
     c = conf[0]
     draw_axs(x_embedded[render_model][c], recs[render_model][c])
+
+
+    axs[0].set_xticks([])
+    axs[0].set_yticks([])
+    axs[1].set_xticks([])
+    axs[1].set_yticks([])
     
         
     fig.canvas.mpl_connect('pick_event', onpick3)
